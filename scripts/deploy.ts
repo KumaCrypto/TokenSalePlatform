@@ -1,29 +1,67 @@
-// We require the Hardhat Runtime Environment explicitly here. This is optional
-// but useful for running the script in a standalone fashion through `node <script>`.
-//
-// When running the script with `npx hardhat run <script>` you'll find the Hardhat
-// Runtime Environment's members available in the global scope.
-import { ethers } from "hardhat";
+import { ethers, run } from "hardhat";
+import { BigNumber } from "ethers";
 
 async function main() {
-  // Hardhat always runs the compile task when running scripts with its command
-  // line interface.
-  //
-  // If this script is run directly using `node` you may want to call compile
-  // manually to make sure everything is compiled
-  // await hre.run('compile');
+  const [signer] = await ethers.getSigners();
 
-  // We get the contract to deploy
-  const Greeter = await ethers.getContractFactory("Greeter");
-  const greeter = await Greeter.deploy("Hello, Hardhat!");
+  // Data for example, change for yourself
+  const L1RewardSale: number = 5;
+  const L2RewardSale: number = 3;
+  const tradeReward: number = 3;
+  const roundDuration: number = 259200; // 3 days
+  const startTokenPrice: BigNumber = ethers.utils.parseEther("0.00001");
+  const startTokenAmount: BigNumber = ethers.utils.parseEther("100000");
+  const MinterRoleBytes =
+    "0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6";
 
-  await greeter.deployed();
+  const SALEPLATFORM = await ethers.getContractFactory("SalePlatform");
+  const _Token = await ethers.getContractFactory("TestToken");
 
-  console.log("Greeter deployed to:", greeter.address);
+  const Token = await _Token.deploy();
+  await Token.deployed();
+
+  const SalePlatform = await SALEPLATFORM.deploy(
+    Token.address,
+    roundDuration,
+    L1RewardSale,
+    L2RewardSale,
+    tradeReward,
+    startTokenPrice,
+    startTokenAmount
+  );
+  await SalePlatform.deployed();
+
+  await Token.grantRole(MinterRoleBytes, SalePlatform.address);
+  await Token.transfer(SalePlatform.address, ethers.utils.parseEther("100000"));
+
+  await run(`verify:verify`, {
+    address: Token.address,
+    contract: "contracts/TestToken.sol:TestToken",
+  });
+
+  await run(`verify:verify`, {
+    address: SalePlatform.address,
+    contract: "contracts/SalePlatform.sol:SalePlatform",
+    constructorArguments: [
+      Token.address,
+      roundDuration,
+      L1RewardSale,
+      L2RewardSale,
+      tradeReward,
+      startTokenPrice,
+      startTokenAmount,
+    ],
+  });
+
+  console.log(`
+    Deployed in rinkeby
+    =================
+    "Platform" contract address: ${SalePlatform.address}
+    "Token" contract address: ${Token.address}
+    ${signer.address} - deployed this contracts
+  `);
 }
 
-// We recommend this pattern to be able to use async/await everywhere
-// and properly handle errors.
 main().catch((error) => {
   console.error(error);
   process.exitCode = 1;

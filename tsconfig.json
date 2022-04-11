@@ -17,6 +17,13 @@
     "hardhat/src/internal/lib/hardhat-lib"
   ],
   "files": [
-    "./hardhat.config.ts"
+    "./hardhat.config.ts",
+    "./addOrder",
+    "./buyToken",
+    "./redeemOrder",
+    "./register",
+    "./removeOrder",
+    "./startSaleRound",
+    "./startTradeRound"
   ]
 }
