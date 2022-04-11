@@ -5,7 +5,6 @@ import "./IToken.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
 
 // This contract can be automated using automatic function call services, such as Gelato.
 // Therefore, there are no checks in the contract on whether the time of the round has ended or not,
@@ -21,15 +20,16 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 //     ERROR #7 = There are not enough tokens left in this round for your transaction;
 //     ERROR #8 = You are trying to buy more tokens than there are in the order;
 //     ERROR #9 = You cannot delete this order;
+//     ERROR #10 = The amount of ETH sent must be greater than 0;
 
 contract SalePlatform is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
-    using Counters for Counters.Counter;
+    using Address for address payable;
 
     address public token;
 
-    Counters.Counter public roundId;
-    Counters.Counter public orderId;
+    uint256 public roundId;
+    uint256 public orderId;
 
     uint256 public roundTimeDuration;
     uint256 public lastTokenPrice;
@@ -100,20 +100,20 @@ contract SalePlatform is ReentrancyGuard, Ownable {
 
     struct ReferralProgram {
         bool isRegistred;
-        address userReferrer;
+        address payable userReferrer;
     }
 
     struct Order {
-        address seller;
+        address payable seller;
         uint256 tokensToSell;
         uint256 tokenPrice;
     }
 
-    mapping(address => ReferralProgram) private referralProgram;
+    mapping(address => ReferralProgram) public referralProgram;
 
-    mapping(uint256 => SaleRound) private saleRounds;
-    mapping(uint256 => TradeRound) private tradeRounds;
-    mapping(uint256 => Order) private orders;
+    mapping(uint256 => SaleRound) public saleRounds;
+    mapping(uint256 => TradeRound) public tradeRounds;
+    mapping(uint256 => Order) public orders;
 
     constructor(
         address _token,
@@ -149,11 +149,11 @@ contract SalePlatform is ReentrancyGuard, Ownable {
     }
 
     modifier isOrderExist(uint256 _orderId) {
-        require(_orderId <= orderId.current(), "Platform: ERROR #2");
+        require(_orderId <= orderId, "Platform: ERROR #2");
         _;
     }
 
-    function register(address referrer) external {
+    function register(address payable referrer) external {
         address registering = _msgSender();
 
         require(
@@ -175,8 +175,7 @@ contract SalePlatform is ReentrancyGuard, Ownable {
     }
 
     function startSaleRound() external isCorrectRound(RoundType.TRADE) {
-        uint256 tradeRoundId = roundId.current();
-        TradeRound memory lastTradeRound = tradeRounds[tradeRoundId];
+        TradeRound memory lastTradeRound = tradeRounds[roundId];
 
         require(
             lastTradeRound.endTime <= block.timestamp,
@@ -186,7 +185,7 @@ contract SalePlatform is ReentrancyGuard, Ownable {
         _startSaleRound();
 
         emit TradeRoundEnded(
-            tradeRoundId,
+            roundId - 1,
             lastTradeRound.totalTradeVolume,
             lastTradeRound.ordersAmount
         );
@@ -196,14 +195,13 @@ contract SalePlatform is ReentrancyGuard, Ownable {
         // since the volume of tokens for sale would be equal to 0.
 
         if (lastTradeRound.totalTradeVolume == 0) {
-            emit SaleRoundEnded(roundId.current(), lastTokenPrice, 0, 0);
+            emit SaleRoundEnded(roundId, lastTokenPrice, 0, 0);
             _startTradeRound();
         }
     }
 
     function startTradeRound() external isCorrectRound(RoundType.SALE) {
-        uint256 saleRoundId = roundId.current();
-        SaleRound memory lastSaleRound = saleRounds[saleRoundId];
+        SaleRound memory lastSaleRound = saleRounds[roundId];
 
         require(
             lastSaleRound.endTime <= block.timestamp ||
@@ -214,17 +212,12 @@ contract SalePlatform is ReentrancyGuard, Ownable {
         _startTradeRound();
 
         emit SaleRoundEnded(
-            saleRoundId,
+            roundId - 1,
             lastSaleRound.tokenPrice,
             lastSaleRound.tokenSupply,
             lastSaleRound.tokensBuyed
         );
     }
-
-    // In the two following functions - there could be checks that msg.value > 0,
-    // but in theory, this should not lead to any problems, since there will be 0 in all values, too.
-    // The only thing is that users who send 0 wei will have to pay a full commission,
-    // as if they have a normal transaction, but on the other hand, we will save on checking for adequate users.
 
     function buyToken()
         external
@@ -232,10 +225,11 @@ contract SalePlatform is ReentrancyGuard, Ownable {
         isCorrectRound(RoundType.SALE)
         nonReentrant
     {
+        require(msg.value > 0, "Platform ERROR #10");
+
         address buyer = _msgSender();
-        uint256 currentRoundId = roundId.current();
         uint256 tokensAmount = calculateTokensAmount(msg.value);
-        SaleRound storage currentRound = saleRounds[currentRoundId];
+        SaleRound storage currentRound = saleRounds[roundId];
 
         require(
             tokensAmount <= currentRound.tokenSupply - currentRound.tokensBuyed,
@@ -243,28 +237,28 @@ contract SalePlatform is ReentrancyGuard, Ownable {
         );
 
         IERC20(token).transfer(buyer, tokensAmount);
-        currentRound.tokensBuyed += tokensAmount;
+        currentRound.tokensBuyed = currentRound.tokensBuyed + tokensAmount;
 
         payToRefferers(buyer);
 
-        emit TokensPurchased(buyer, currentRoundId, tokensAmount);
+        emit TokensPurchased(buyer, roundId, tokensAmount);
     }
 
     function addOrder(uint256 amount, uint256 priceInETH)
         external
         isCorrectRound(RoundType.TRADE)
     {
-        address seller = _msgSender();
+        address payable seller = payable(_msgSender());
 
         IERC20(token).transferFrom(seller, address(this), amount);
-        tokensOnSell += amount;
+        tokensOnSell = tokensOnSell + amount;
 
-        orderId.increment();
-        orders[orderId.current()] = Order(seller, amount, priceInETH);
+        orderId++;
+        orders[orderId] = Order(seller, amount, priceInETH);
 
-        tradeRounds[roundId.current()].ordersAmount++;
+        tradeRounds[roundId].ordersAmount++;
 
-        emit OrderAdded(seller, orderId.current(), amount, priceInETH);
+        emit OrderAdded(seller, orderId, amount, priceInETH);
     }
 
     function redeemOrder(uint256 _orderId)
@@ -274,6 +268,8 @@ contract SalePlatform is ReentrancyGuard, Ownable {
         isCorrectRound(RoundType.TRADE)
         isOrderExist(_orderId)
     {
+        require(msg.value > 0, "Platform ERROR #10");
+
         Order storage currentOrder = orders[_orderId];
 
         uint256 tokensAmount = msg.value / currentOrder.tokenPrice;
@@ -288,11 +284,13 @@ contract SalePlatform is ReentrancyGuard, Ownable {
 
         IERC20(token).transfer(buyer, tokensAmount);
 
-        tokensOnSell -= tokensAmount;
-        currentOrder.tokensToSell -= tokensAmount;
-        tradeRounds[roundId.current()].totalTradeVolume += msg.value;
+        tokensOnSell = tokensOnSell - tokensAmount;
+        currentOrder.tokensToSell = currentOrder.tokensToSell - tokensAmount;
+        tradeRounds[roundId].totalTradeVolume =
+            tradeRounds[roundId].totalTradeVolume +
+            msg.value;
 
-        Address.sendValue(payable(currentOrder.seller), amountToSeller);
+        currentOrder.seller.sendValue(amountToSeller);
         payToRefferers(currentOrder.seller);
 
         emit OrderRedeemed(
@@ -325,7 +323,7 @@ contract SalePlatform is ReentrancyGuard, Ownable {
                 currentOrder.seller,
                 currentOrder.tokensToSell
             );
-            tokensOnSell -= currentOrder.tokensToSell;
+            tokensOnSell = tokensOnSell - currentOrder.tokensToSell;
         }
 
         emit OrderRemoved(
@@ -339,14 +337,14 @@ contract SalePlatform is ReentrancyGuard, Ownable {
     // Private functions
     function _startSaleRound() private {
         uint256 newTokensAmount = calculateTokensAmount(
-            tradeRounds[roundId.current()].totalTradeVolume
+            tradeRounds[roundId].totalTradeVolume
         );
 
         lastTokenPrice = calculateNewPrice();
 
-        roundId.increment();
+        roundId++;
 
-        saleRounds[roundId.current()] = SaleRound(
+        saleRounds[roundId] = SaleRound(
             lastTokenPrice,
             newTokensAmount,
             block.timestamp + roundTimeDuration,
@@ -365,8 +363,8 @@ contract SalePlatform is ReentrancyGuard, Ownable {
             IToken(token).burn(balance - tokensOnSell);
         }
 
-        roundId.increment();
-        tradeRounds[roundId.current()] = TradeRound(
+        roundId++;
+        tradeRounds[roundId] = TradeRound(
             0,
             block.timestamp + roundTimeDuration,
             0
@@ -376,34 +374,32 @@ contract SalePlatform is ReentrancyGuard, Ownable {
     }
 
     function payToRefferers(address seller) private {
-        address l1Refferer = referralProgram[seller].userReferrer;
+        address payable l1Refferer = referralProgram[seller].userReferrer;
 
         if (currentRoundType == RoundType.SALE) {
             if (l1Refferer != address(0)) {
-                Address.sendValue(
-                    payable(l1Refferer),
+                l1Refferer.sendValue(
                     (msg.value / 100) * rewardForL1ReffererInSale
                 );
 
-                address l2Refferer = referralProgram[l1Refferer].userReferrer;
+                address payable l2Refferer = referralProgram[l1Refferer]
+                    .userReferrer;
                 if (l2Refferer != address(0)) {
-                    Address.sendValue(
-                        payable(l2Refferer),
+                    l2Refferer.sendValue(
                         (msg.value / 100) * rewardForL2ReffererInSale
                     );
                 }
             }
         } else {
             if (l1Refferer != address(0)) {
-                Address.sendValue(
-                    payable(l1Refferer),
+                l1Refferer.sendValue(
                     (msg.value / 100) * rewardForRefferersInTrade
                 );
 
-                address l2Refferer = referralProgram[l1Refferer].userReferrer;
+                address payable l2Refferer = referralProgram[l1Refferer]
+                    .userReferrer;
                 if (l2Refferer != address(0)) {
-                    Address.sendValue(
-                        payable(l2Refferer),
+                    l2Refferer.sendValue(
                         (msg.value / 100) * rewardForRefferersInTrade
                     );
                 }
@@ -422,82 +418,5 @@ contract SalePlatform is ReentrancyGuard, Ownable {
         returns (uint256)
     {
         return (value / lastTokenPrice) * 10**18;
-    }
-
-    // Getters
-    function getUserReferrer(address _user) external view returns (address) {
-        return referralProgram[_user].userReferrer;
-    }
-
-    function isUserRegistred(address _user) external view returns (bool) {
-        return referralProgram[_user].isRegistred;
-    }
-
-    function getTokensBuyed(uint256 _roundId) external view returns (uint256) {
-        return saleRounds[_roundId].tokensBuyed;
-    }
-
-    function getSaleRoundEndTime(uint256 _roundId)
-        external
-        view
-        returns (uint256)
-    {
-        return saleRounds[_roundId].endTime;
-    }
-
-    function getSaleRoundTokenSupply(uint256 _roundId)
-        external
-        view
-        returns (uint256)
-    {
-        return saleRounds[_roundId].tokenSupply;
-    }
-
-    function getTotalTradeVolume(uint256 _roundId)
-        external
-        view
-        returns (uint256)
-    {
-        return tradeRounds[_roundId].totalTradeVolume;
-    }
-
-    function getTradeRoundEndTime(uint256 _roundId)
-        external
-        view
-        returns (uint256)
-    {
-        return tradeRounds[_roundId].endTime;
-    }
-
-    function getTradeRoundOrdersAmount(uint256 _roundId)
-        external
-        view
-        returns (uint256)
-    {
-        return tradeRounds[_roundId].ordersAmount;
-    }
-
-    function getSellerOfOrder(uint256 _orderId)
-        external
-        view
-        returns (address)
-    {
-        return orders[_orderId].seller;
-    }
-
-    function getOrderTokenPrice(uint256 _orderId)
-        external
-        view
-        returns (uint256)
-    {
-        return orders[_orderId].tokenPrice;
-    }
-
-    function getOrderTokensAmount(uint256 _orderId)
-        external
-        view
-        returns (uint256)
-    {
-        return orders[_orderId].tokensToSell;
     }
 }
