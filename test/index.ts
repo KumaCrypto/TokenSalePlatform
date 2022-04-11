@@ -89,14 +89,13 @@ describe("TokenSalePlatform", function () {
           .timestamp +
         roundDuration -
         2;
-
-      expect(await SalePlatform.getSaleRoundEndTime(0)).to.eq(time);
+      const saleEndTime = await SalePlatform.saleRounds(0);
+      expect(saleEndTime[2]).to.eq(time);
     });
 
     it("getSaleRoundTokenSupply", async () => {
-      expect(await SalePlatform.getSaleRoundTokenSupply(0)).to.eq(
-        ethers.utils.parseEther("100000")
-      );
+      const tokenSupply = await SalePlatform.saleRounds(0);
+      expect(tokenSupply[1]).to.eq(ethers.utils.parseEther("100000"));
     });
 
     it("getTradeRoundEndTime", async () => {
@@ -106,8 +105,8 @@ describe("TokenSalePlatform", function () {
       const time =
         (await ethers.provider.getBlock(await ethers.provider.getBlockNumber()))
           .timestamp + roundDuration;
-
-      expect(await SalePlatform.getTradeRoundEndTime(1)).to.eq(time);
+      const endTime = await SalePlatform.tradeRounds(1);
+      expect(endTime[1]).to.eq(time);
     });
   });
 
@@ -131,18 +130,16 @@ describe("TokenSalePlatform", function () {
   describe("register", () => {
     it("register: Is User Registred", async () => {
       await SalePlatform.register(zeroAddress);
-      expect(await SalePlatform.isUserRegistred(signers[0].address)).to.eq(
-        true
-      );
+      const bio = await SalePlatform.referralProgram(signers[0].address);
+      expect(bio[0]).to.eq(true);
     });
 
     it("register: Referrer is correct", async () => {
       await SalePlatform.register(zeroAddress);
       await SalePlatform.connect(signers[1]).register(signers[0].address);
 
-      expect(await SalePlatform.getUserReferrer(signers[1].address)).to.eq(
-        signers[0].address
-      );
+      const bio = await SalePlatform.referralProgram(signers[1].address);
+      expect(bio[1]).to.eq(signers[0].address);
     });
 
     it("register: Reverted - already registred", async () => {
@@ -276,6 +273,12 @@ describe("TokenSalePlatform", function () {
     const l1Reward = ethers.utils.parseEther("0.005");
     const l2Reward = ethers.utils.parseEther("0.003");
 
+    it("buyToken: msg.value = 0 => reverted", async () => {
+      await expect(SalePlatform.buyToken({ value: 0 })).to.be.revertedWith(
+        "Platform ERROR #10"
+      );
+    });
+
     it("buyToken: msg.value is too high => reverted", async () => {
       await expect(
         SalePlatform.buyToken({ value: ethers.utils.parseEther("1.1") })
@@ -290,9 +293,8 @@ describe("TokenSalePlatform", function () {
 
     it("buyToken: TokensBuyed increased", async () => {
       await SalePlatform.buyToken({ value: Value });
-      expect(await SalePlatform.getTokensBuyed(0)).to.eq(
-        ethers.utils.parseEther("10000")
-      );
+      const tokensBuyed = await SalePlatform.saleRounds(0);
+      expect(tokensBuyed[3]).to.eq(ethers.utils.parseEther("10000"));
     });
 
     it("buyToken: To emit 'TokensPurchased'", async () => {
@@ -345,15 +347,17 @@ describe("TokenSalePlatform", function () {
 
     it("addOrder: The order is added to the orders", async () => {
       await SalePlatform.addOrder(defaultAmount, 1);
+      const order = await SalePlatform.orders(1);
 
-      expect(await SalePlatform.getSellerOfOrder(1)).to.eq(signers[0].address);
-      expect(await SalePlatform.getOrderTokenPrice(1)).to.eq(1);
-      expect(await SalePlatform.getOrderTokensAmount(1)).to.eq(defaultAmount);
+      expect(order[0]).to.eq(signers[0].address);
+      expect(order[2]).to.eq(1);
+      expect(order[1]).to.eq(defaultAmount);
     });
 
     it("addOrder: Increased the number of orders", async () => {
       await SalePlatform.addOrder(defaultAmount, 1);
-      expect(await SalePlatform.getTradeRoundOrdersAmount(1)).to.eq(1);
+      const tradeRound = await SalePlatform.tradeRounds(1);
+      expect(tradeRound[2]).to.eq(1);
     });
 
     it("addOrder: To emit OrderAdded ", async () => {
@@ -381,6 +385,12 @@ describe("TokenSalePlatform", function () {
       ).to.be.revertedWith("Platform: ERROR #8");
     });
 
+    it("redeemOrder: msg.value = 0 => reverted", async () => {
+      await expect(
+        SalePlatform.redeemOrder(1, { value: 0 })
+      ).to.be.revertedWith("Platform ERROR #10");
+    });
+
     it("redeemOrder: transfered correct token amount", async () => {
       const balanceBefore = await Token.balanceOf(signers[0].address);
 
@@ -398,14 +408,14 @@ describe("TokenSalePlatform", function () {
 
     it("redeemOrder: Reduce tokensAmount", async () => {
       await SalePlatform.redeemOrder(1, { value: defaultAmount });
-
-      expect(await SalePlatform.getOrderTokensAmount(1)).to.eq(0);
+      const order = await SalePlatform.orders(1);
+      expect(order[1]).to.eq(0);
     });
 
     it("redeemOrder: Increased totalTradeVolume", async () => {
       await SalePlatform.redeemOrder(1, { value: defaultAmount });
-
-      expect(await SalePlatform.getTotalTradeVolume(1)).to.eq(defaultAmount);
+      const tradeRound = await SalePlatform.tradeRounds(1);
+      expect(tradeRound[0]).to.eq(defaultAmount);
     });
 
     it("redeemOrder: sent a correct value to seller without a referrs", async () => {
@@ -464,10 +474,21 @@ describe("TokenSalePlatform", function () {
 
     it("removeOrder: Order deleted", async () => {
       await SalePlatform.removeOrder(1);
+      const order = await SalePlatform.orders(1);
 
-      expect(await SalePlatform.getSellerOfOrder(1)).to.eq(zeroAddress);
-      expect(await SalePlatform.getOrderTokenPrice(1)).to.eq(0);
-      expect(await SalePlatform.getOrderTokensAmount(1)).to.eq(0);
+      expect(order[0]).to.eq(zeroAddress);
+      expect(order[2]).to.eq(0);
+      expect(order[1]).to.eq(0);
+    });
+
+    it("removeOrder: If path", async () => {
+      await SalePlatform.redeemOrder(1, { value: defaultAmount });
+      await SalePlatform.removeOrder(1);
+      const order = await SalePlatform.orders(1);
+
+      expect(order[0]).to.eq(zeroAddress);
+      expect(order[2]).to.eq(0);
+      expect(order[1]).to.eq(0);
     });
 
     it("removeOrder: Return tokens", async () => {
