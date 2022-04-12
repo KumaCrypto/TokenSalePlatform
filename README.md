@@ -27,7 +27,7 @@ When buying tokens in the Sale round, referrer_1 will receive X% of its purchase
 When buying in the Trade round, the user who placed an order for the sale of tokens will receive X% ETH and referrers will receive X%, in case of their absence, the platform takes these percentages for itself.
 
 Price ETH = lastPrice * 1,03 + 0,000004
-Example of token price calculation: 0,0000100 * 1,03 + 0,000004 = 0.0000143
+- Example of token price calculation: 0,0000100 * 1,03 + 0,000004 = 0.0000143
 
 ### Deployed in rinkeby:
 
