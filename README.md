@@ -14,5 +14,5 @@ File               |  % Stmts | % Branch |  % Funcs |  % Lines |Uncovered Lines 
   IToken.sol       |      100 |      100 |      100 |      100 |                |
   SalePlatform.sol |      100 |      100 |      100 |      100 |                |
   TestToken.sol    |      100 |      100 |      100 |      100 |                |
-    All files      |      100 |      100 |      100 |      100 |                |
-
+  All files        |      100 |      100 |      100 |      100 |                |
+-------------------|----------|----------|----------|----------|----------------|
