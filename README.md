@@ -1,7 +1,7 @@
 # A platform for selling tokens.
 
 ## Deployed in rinkeby:
----
+
   Contracts        |                             Addresses                      |
 -------------------|----------|----------|----------|----------|----------------|
   Platfrom         |        0x74fd5dCa8E10f8D4A572D51a01Ce25F5eB57c949          |
