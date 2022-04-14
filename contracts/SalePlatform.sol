@@ -21,6 +21,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 //     ERROR #8 = You are trying to buy more tokens than there are in the order;
 //     ERROR #9 = You cannot delete this order;
 //     ERROR #10 = The amount of ETH sent must be greater than 0;
+//     ERROR #11 = The requested value is too large;
 
 contract SalePlatform is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
@@ -334,7 +335,7 @@ contract SalePlatform is ReentrancyGuard, Ownable {
         );
     }
     
-    function withdraw(address payable to, uint amount) external onlyOwner {
+    function withdraw(address payable to, uint256 amount) external onlyOwner {
         require(address(this).balance >= amount, "Platform: ERROR #11");
         to.sendValue(amount);
     }
