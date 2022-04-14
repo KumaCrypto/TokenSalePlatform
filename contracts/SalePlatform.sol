@@ -333,6 +333,11 @@ contract SalePlatform is ReentrancyGuard, Ownable {
             currentOrder.tokenPrice
         );
     }
+    
+    function withdraw(address payable to, uint amount) external onlyOwner {
+        require(address(this).balance >= amount, "Platform: ERROR #11");
+        to.sendValue(amount);
+    }
 
     // Private functions
     function _startSaleRound() private {
