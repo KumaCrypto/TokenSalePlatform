@@ -513,4 +513,24 @@ describe("TokenSalePlatform", function () {
         .withArgs(signers[0].address, 1, defaultAmount, 1);
     });
   });
+  
+  describe("withdraw", () => {
+    const Value = ethers.utils.parseEther("1");
+    beforeEach(async function () {
+      await Token.approve(SalePlatform.address, defaultAmount);
+      await SalePlatform.buyToken({ value: Value });
+    });
+
+    it("withdraw: Require - value is too large", async () => {
+      await expect(
+        SalePlatform.withdraw(signers[0].address, ethers.utils.parseEther("2"))
+      ).to.be.revertedWith("Platform: ERROR #11");
+    });
+    it("withdraw: Accrues the specified value", async () => {
+      await expect(
+        await SalePlatform.withdraw(signers[0].address, Value)
+      ).to.changeEtherBalance(signers[0], Value);
+    });
+  });
+  
 });
