@@ -31,6 +31,7 @@ contract SalePlatform is ReentrancyGuard, Ownable {
     // so we put the address of the token and the rounds in one slot
     address public token;  
     uint96 public roundId;
+    
     uint256 public orderId;
 
     uint256 public roundTimeDuration;
@@ -256,10 +257,10 @@ contract SalePlatform is ReentrancyGuard, Ownable {
         IERC20(token).transferFrom(seller, address(this), amount);
         tokensOnSell = tokensOnSell + amount;
 
-        orderId++;
+        ++orderId;
         orders[orderId] = Order(seller, amount, priceInETH);
 
-        tradeRounds[roundId].ordersAmount++;
+        ++tradeRounds[roundId].ordersAmount;
 
         emit OrderAdded(seller, orderId, amount, priceInETH);
     }
@@ -289,9 +290,7 @@ contract SalePlatform is ReentrancyGuard, Ownable {
 
         tokensOnSell = tokensOnSell - tokensAmount;
         currentOrder.tokensToSell = currentOrder.tokensToSell - tokensAmount;
-        tradeRounds[roundId].totalTradeVolume =
-            tradeRounds[roundId].totalTradeVolume +
-            msg.value;
+        tradeRounds[roundId].totalTradeVolume += msg.value;
 
         currentOrder.seller.sendValue(amountToSeller);
         payToRefferers(currentOrder.seller);
@@ -326,7 +325,7 @@ contract SalePlatform is ReentrancyGuard, Ownable {
                 currentOrder.seller,
                 currentOrder.tokensToSell
             );
-            tokensOnSell = tokensOnSell - currentOrder.tokensToSell;
+            tokensOnSell -= currentOrder.tokensToSell;
         }
 
         emit OrderRemoved(
@@ -371,7 +370,7 @@ contract SalePlatform is ReentrancyGuard, Ownable {
             IToken(token).burn(balance - tokensOnSell);
         }
 
-        roundId++;
+        ++roundId;
         tradeRounds[roundId] = TradeRound(
             0,
             block.timestamp + roundTimeDuration,
