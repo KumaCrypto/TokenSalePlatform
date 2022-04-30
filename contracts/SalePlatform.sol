@@ -349,7 +349,7 @@ contract SalePlatform is ReentrancyGuard, Ownable {
 
         lastTokenPrice = calculateNewPrice();
 
-        roundId++;
+        ++roundId;
 
         saleRounds[roundId] = SaleRound(
             lastTokenPrice,
