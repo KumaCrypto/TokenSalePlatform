@@ -26,13 +26,13 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract SalePlatform is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
     using Address for address payable;
+
+    address public immutable token;
     
-    // Most likely, the number of rounds will not reach the maximum value of uint96,
-    // so we put the address of the token and the rounds in one slot
-    address public token;  
-    uint96 public roundId;
-    
-    uint256 public orderId;
+    // Probably the number of rounds and orders will not exceed 2 to the power of 128,
+    // so we can put them in one slot
+    uint128 public roundId;
+    uint128 public orderId;
 
     uint256 public roundTimeDuration;
     uint256 public lastTokenPrice;
@@ -48,36 +48,36 @@ contract SalePlatform is ReentrancyGuard, Ownable {
 
     event Registred(address indexed referral, address indexed referrer);
     event SaleRoundEnded(
-        uint256 indexed roundId,
+        uint128 indexed roundId,
         uint256 tokenPrice,
         uint256 tokenSupply,
         uint256 tokensBuyed
     );
     event TradeRoundEnded(
-        uint256 indexed roundId,
+        uint128 indexed roundId,
         uint256 tradeVolume,
         uint256 ordersAmount
     );
     event TokensPurchased(
         address indexed buyer,
-        uint256 indexed roundId,
+        uint128 indexed roundId,
         uint256 tokensAmount
     );
     event OrderAdded(
         address indexed seller,
-        uint256 indexed orderId,
+        uint128 indexed orderId,
         uint256 tokensAmount,
         uint256 tokenPrice
     );
     event OrderRemoved(
         address indexed seller,
-        uint256 indexed orderId,
+        uint128 indexed orderId,
         uint256 tokensWithdrawn,
         uint256 tokenPrice
     );
     event OrderRedeemed(
         address indexed buyer,
-        uint256 indexed orderId,
+        uint128 indexed orderId,
         uint256 tokensAmount,
         uint256 tokenPrice
     );
@@ -115,8 +115,8 @@ contract SalePlatform is ReentrancyGuard, Ownable {
 
     mapping(address => ReferralProgram) public referralProgram;
 
-    mapping(uint256 => SaleRound) public saleRounds;
-    mapping(uint256 => TradeRound) public tradeRounds;
+    mapping(uint128 => SaleRound) public saleRounds;
+    mapping(uint128 => TradeRound) public tradeRounds;
     mapping(uint256 => Order) public orders;
 
     constructor(
@@ -152,7 +152,7 @@ contract SalePlatform is ReentrancyGuard, Ownable {
         _;
     }
 
-    modifier isOrderExist(uint256 _orderId) {
+    modifier isOrderExist(uint128 _orderId) {
         require(_orderId <= orderId, "Platform: ERROR #2");
         _;
     }
@@ -265,7 +265,7 @@ contract SalePlatform is ReentrancyGuard, Ownable {
         emit OrderAdded(seller, orderId, amount, priceInETH);
     }
 
-    function redeemOrder(uint256 _orderId)
+    function redeemOrder(uint128 _orderId)
         external
         payable
         nonReentrant
@@ -303,7 +303,7 @@ contract SalePlatform is ReentrancyGuard, Ownable {
         );
     }
 
-    function removeOrder(uint256 _orderId)
+    function removeOrder(uint128 _orderId)
         external
         isCorrectRound(RoundType.TRADE)
         isOrderExist(_orderId)
