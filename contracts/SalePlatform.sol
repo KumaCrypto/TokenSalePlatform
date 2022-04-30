@@ -26,21 +26,23 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract SalePlatform is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
     using Address for address payable;
-
-    address public token;
-
-    uint256 public roundId;
+    
+    // Most likely, the number of rounds will not reach the maximum value of uint96,
+    // so we put the address of the token and the rounds in one slot
+    address public token;  
+    uint96 public roundId;
     uint256 public orderId;
 
     uint256 public roundTimeDuration;
     uint256 public lastTokenPrice;
-
-    uint256 public rewardForL1ReffererInSale;
-    uint256 public rewardForL2ReffererInSale;
-    uint256 public rewardForRefferersInTrade;
-
     uint256 public tokensOnSell;
 
+    // Since the following variables express the number of percentages and cannot be more than 100,
+    // we can put them in one slot
+    uint64 public rewardForL1ReffererInSale;
+    uint64 public rewardForL2ReffererInSale;
+    uint64 public rewardForRefferersInTrade;
+    
     RoundType public currentRoundType;
 
     event Registred(address indexed referral, address indexed referrer);
@@ -118,10 +120,10 @@ contract SalePlatform is ReentrancyGuard, Ownable {
 
     constructor(
         address _token,
+        uint64 saleL1Rewards,
+        uint64 saleL2Rewards,
+        uint64 tradeReward,
         uint256 _roundTime,
-        uint256 saleL1Rewards,
-        uint256 saleL2Rewards,
-        uint256 tradeReward,
         uint256 startTokenPrice,
         uint256 startTokenAmount
     ) {
