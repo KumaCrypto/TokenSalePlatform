@@ -117,7 +117,7 @@ contract SalePlatform is ReentrancyGuard, Ownable {
 
     mapping(uint128 => SaleRound) public saleRounds;
     mapping(uint128 => TradeRound) public tradeRounds;
-    mapping(uint256 => Order) public orders;
+    mapping(uint128 => Order) public orders;
 
     constructor(
         address _token,
