@@ -38,10 +38,10 @@ describe("TokenSalePlatform", function () {
     Token = await new TestToken__factory(signers[0]).deploy();
     SalePlatform = await new SalePlatform__factory(signers[0]).deploy(
       Token.address,
-      roundDuration,
       L1RewardSale,
       L2RewardSale,
       tradeReward,
+      roundDuration,
       startTokenPrice,
       startTokenAmount
     );
@@ -513,7 +513,7 @@ describe("TokenSalePlatform", function () {
         .withArgs(signers[0].address, 1, defaultAmount, 1);
     });
   });
-  
+
   describe("withdraw", () => {
     const Value = ethers.utils.parseEther("1");
     beforeEach(async function () {
@@ -532,5 +532,4 @@ describe("TokenSalePlatform", function () {
       ).to.changeEtherBalance(signers[0], Value);
     });
   });
-  
 });
